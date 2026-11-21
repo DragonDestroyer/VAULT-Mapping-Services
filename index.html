@@ -13,11 +13,11 @@
       user-select: none;
     }
     #cube-wrap {
-      width: 120px; height: 120px; border-radius: 12px;
+      width: 148px; height: 148px; border-radius: 12px;
       background: rgba(20, 22, 26, 0.72); border: 1px solid rgba(255,255,255,0.12);
-      overflow: hidden; cursor: pointer;
+      overflow: hidden;
     }
-    #cube { width: 100%; height: 100%; display: block; }
+    #cube { width: 148px; height: 148px; display: block; cursor: crosshair; }
     #home {
       background: rgba(20, 22, 26, 0.85); color: #f3f3f3;
       border: 1px solid rgba(255,255,255,0.16); border-radius: 10px;
@@ -33,8 +33,8 @@
 <body>
   <canvas id="view"></canvas>
   <div id="hud">
-    <div id="cube-wrap" title="Click a face to look from that side">
-      <canvas id="cube"></canvas>
+    <div id="cube-wrap" title="Click a face, edge, or corner">
+      <canvas id="cube" width="148" height="148"></canvas>
     </div>
     <button id="home" type="button">Home</button>
   </div>
@@ -62,7 +62,6 @@
       new THREE.MeshLambertMaterial({ color: 0x8d9298 })
     );
     ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
     scene.add(ground);
 
     const block = new THREE.Mesh(
@@ -76,7 +75,6 @@
     const sun = new THREE.DirectionalLight(0xffffff, 1.1);
     sun.position.set(8, 14, 6);
     scene.add(sun);
-
     const grid = new THREE.GridHelper(40, 20, 0x5c626a, 0x6e747c);
     grid.position.y = 0.01;
     scene.add(grid);
@@ -87,8 +85,7 @@
     const homeTarget = target.clone();
 
     function applyCamera() {
-      const offset = new THREE.Vector3().setFromSpherical(spherical);
-      camera.position.copy(target).add(offset);
+      camera.position.copy(target).add(new THREE.Vector3().setFromSpherical(spherical));
       camera.lookAt(target);
     }
     applyCamera();
@@ -96,45 +93,49 @@
     const cubeRenderer = new THREE.WebGLRenderer({ canvas: cubeCanvas, antialias: true, alpha: true });
     cubeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     const cubeScene = new THREE.Scene();
-    const cubeCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 20);
-    const cubeGeo = new THREE.BoxGeometry(1.4, 1.4, 1.4);
-    const faceMats = [
-      new THREE.MeshBasicMaterial({ color: 0xd7dbe0 }), // +x right
-      new THREE.MeshBasicMaterial({ color: 0xb7bcc2 }), // -x left
-      new THREE.MeshBasicMaterial({ color: 0xf2f4f6 }), // +y top
-      new THREE.MeshBasicMaterial({ color: 0x8e949b }), // -y bottom
-      new THREE.MeshBasicMaterial({ color: 0xc5cad0 }), // +z front
-      new THREE.MeshBasicMaterial({ color: 0xaeb4ba }), // -z back
-    ];
-    const cubeMesh = new THREE.Mesh(cubeGeo, faceMats);
-    cubeScene.add(cubeMesh);
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(cubeGeo),
-      new THREE.LineBasicMaterial({ color: 0x1b1e22 })
+    const cubeCamera = new THREE.PerspectiveCamera(35, 1, 0.1, 20);
+    const SIZE = 1.5;
+    const HALF = SIZE / 2;
+    const EDGE = 0.28;
+    const cubeMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(SIZE, SIZE, SIZE),
+      [
+        new THREE.MeshBasicMaterial({ color: 0xd7dbe0 }),
+        new THREE.MeshBasicMaterial({ color: 0xb7bcc2 }),
+        new THREE.MeshBasicMaterial({ color: 0xf2f4f6 }),
+        new THREE.MeshBasicMaterial({ color: 0x8e949b }),
+        new THREE.MeshBasicMaterial({ color: 0xc5cad0 }),
+        new THREE.MeshBasicMaterial({ color: 0xaeb4ba }),
+      ]
     );
-    cubeScene.add(edges);
+    cubeScene.add(cubeMesh);
+    cubeScene.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(SIZE, SIZE, SIZE)),
+      new THREE.LineBasicMaterial({ color: 0x1b1e22 })
+    ));
 
     function makeLabel(text) {
       const c = document.createElement('canvas');
       c.width = 128; c.height = 128;
       const g = c.getContext('2d');
       g.fillStyle = '#1c1f24';
-      g.font = 'bold 28px system-ui, sans-serif';
+      g.font = 'bold 26px system-ui, sans-serif';
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.fillText(text, 64, 64);
-      const tex = new THREE.CanvasTexture(c);
-      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
-      const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), mat);
+      const plane = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.72, 0.72),
+        new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true })
+      );
       return plane;
     }
     const labels = [
-      ['RIGHT',  new THREE.Vector3(0.71, 0, 0),  0,  Math.PI / 2],
-      ['LEFT',   new THREE.Vector3(-0.71, 0, 0), 0, -Math.PI / 2],
-      ['TOP',    new THREE.Vector3(0, 0.71, 0),  -Math.PI / 2, 0],
-      ['BOTTOM', new THREE.Vector3(0, -0.71, 0), Math.PI / 2, 0],
-      ['FRONT',  new THREE.Vector3(0, 0, 0.71),  0, 0],
-      ['BACK',   new THREE.Vector3(0, 0, -0.71), 0, Math.PI],
+      ['RIGHT',  new THREE.Vector3(HALF + 0.01, 0, 0), 0, Math.PI / 2],
+      ['LEFT',   new THREE.Vector3(-HALF - 0.01, 0, 0), 0, -Math.PI / 2],
+      ['TOP',    new THREE.Vector3(0, HALF + 0.01, 0), -Math.PI / 2, 0],
+      ['BOTTOM', new THREE.Vector3(0, -HALF - 0.01, 0), Math.PI / 2, 0],
+      ['FRONT',  new THREE.Vector3(0, 0, HALF + 0.01), 0, 0],
+      ['BACK',   new THREE.Vector3(0, 0, -HALF - 0.01), 0, Math.PI],
     ];
     for (const [text, pos, rx, ry] of labels) {
       const plane = makeLabel(text);
@@ -143,31 +144,114 @@
       cubeScene.add(plane);
     }
 
+    const highlightMat = new THREE.MeshBasicMaterial({
+      color: 0x1aa3ff, transparent: true, opacity: 0.72, depthTest: false,
+    });
+    const highlights = [];
+    function addHighlight(geo, pos, dir) {
+      const mesh = new THREE.Mesh(geo, highlightMat);
+      mesh.position.copy(pos);
+      mesh.visible = false;
+      mesh.userData.dir = dir.clone().normalize();
+      cubeScene.add(mesh);
+      highlights.push(mesh);
+      return mesh;
+    }
+    const faceSpan = SIZE - EDGE * 2;
+    const axes = [
+      { axis: 'x', sign: 1, normal: new THREE.Vector3(1, 0, 0) },
+      { axis: 'x', sign: -1, normal: new THREE.Vector3(-1, 0, 0) },
+      { axis: 'y', sign: 1, normal: new THREE.Vector3(0, 1, 0) },
+      { axis: 'y', sign: -1, normal: new THREE.Vector3(0, -1, 0) },
+      { axis: 'z', sign: 1, normal: new THREE.Vector3(0, 0, 1) },
+      { axis: 'z', sign: -1, normal: new THREE.Vector3(0, 0, -1) },
+    ];
+    for (const face of axes) {
+      const geo = face.axis === 'x'
+        ? new THREE.BoxGeometry(0.06, faceSpan, faceSpan)
+        : face.axis === 'y'
+          ? new THREE.BoxGeometry(faceSpan, 0.06, faceSpan)
+          : new THREE.BoxGeometry(faceSpan, faceSpan, 0.06);
+      const pos = face.normal.clone().multiplyScalar(HALF + 0.03);
+      addHighlight(geo, pos, face.normal);
+    }
+    const edgePairs = [
+      ['x', 'y'], ['x', 'z'], ['y', 'z'],
+    ];
+    for (const [a, b] of edgePairs) {
+      for (const sa of [-1, 1]) for (const sb of [-1, 1]) {
+        const dir = new THREE.Vector3();
+        dir[a] = sa; dir[b] = sb;
+        const pos = dir.clone().multiplyScalar(HALF - EDGE / 2 + 0.02);
+        pos[a] = sa * (HALF + 0.03);
+        pos[b] = sb * (HALF + 0.03);
+        const size = { x: faceSpan, y: faceSpan, z: faceSpan };
+        size[a] = EDGE; size[b] = EDGE;
+        const geo = new THREE.BoxGeometry(size.x, size.y, 0.06);
+        const mesh = addHighlight(geo, pos, dir);
+        if (a !== 'z' && b !== 'z') mesh.rotation.x = Math.PI / 2;
+        if (a === 'y' && b === 'z') mesh.rotation.y = Math.PI / 2;
+      }
+    }
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+      const dir = new THREE.Vector3(sx, sy, sz);
+      const pos = dir.clone().multiplyScalar(HALF - EDGE / 2 + 0.02);
+      pos.add(dir.clone().multiplyScalar(0.03));
+      addHighlight(new THREE.BoxGeometry(EDGE, EDGE, EDGE), pos, dir);
+    }
+
+    function classify(point) {
+      const p = point.clone();
+      const marks = ['x', 'y', 'z'].map((axis) => ({
+        axis,
+        sign: Math.sign(p[axis]) || 1,
+        edge: Math.abs(p[axis]) > HALF - EDGE,
+      }));
+      const edges = marks.filter((m) => m.edge);
+      const dir = new THREE.Vector3();
+      for (const m of edges.length ? edges : marks.filter((m) => Math.abs(p[m.axis]) === Math.max(...marks.map((n) => Math.abs(p[n.axis]))))) {
+        dir[m.axis] = m.sign;
+      }
+      if (edges.length === 0) {
+        const dominant = marks.slice().sort((a, b) => Math.abs(p[b.axis]) - Math.abs(p[a.axis]))[0];
+        dir.set(0, 0, 0);
+        dir[dominant.axis] = dominant.sign;
+      }
+      return dir.normalize();
+    }
+    function sameDir(a, b) {
+      return a.clone().normalize().distanceTo(b.clone().normalize()) < 0.2;
+    }
+    function showHighlight(dir) {
+      for (const h of highlights) h.visible = dir ? sameDir(h.userData.dir, dir) : false;
+    }
+    function lookFrom(dir) {
+      const n = dir.clone().normalize();
+      spherical.phi = Math.acos(THREE.MathUtils.clamp(n.y, -1, 1));
+      spherical.theta = Math.atan2(n.x, n.z);
+      spherical.radius = 18;
+      applyCamera();
+    }
+
     const cubeRay = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
-    cubeCanvas.addEventListener('pointerdown', (e) => {
+    function pick(e) {
       const rect = cubeCanvas.getBoundingClientRect();
       ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       cubeRay.setFromCamera(ndc, cubeCamera);
       const hit = cubeRay.intersectObject(cubeMesh, false)[0];
-      if (!hit || !hit.face) return;
-      const n = hit.face.normal.clone();
-      const views = {
-        '1,0,0':  [Math.PI / 2, 0],
-        '-1,0,0': [-Math.PI / 2, 0],
-        '0,1,0':  [0, 0.01],
-        '0,-1,0': [0, Math.PI - 0.01],
-        '0,0,1':  [0, Math.PI / 2],
-        '0,0,-1': [Math.PI, Math.PI / 2],
-      };
-      const key = `${Math.round(n.x)},${Math.round(n.y)},${Math.round(n.z)}`;
-      const view = views[key];
-      if (!view) return;
-      spherical.theta = view[0];
-      spherical.phi = view[1];
-      spherical.radius = 18;
-      applyCamera();
+      return hit ? classify(hit.point) : null;
+    }
+    cubeCanvas.addEventListener('pointermove', (e) => {
+      const dir = pick(e);
+      showHighlight(dir);
+      cubeCanvas.style.cursor = dir ? 'pointer' : 'crosshair';
+    });
+    cubeCanvas.addEventListener('pointerleave', () => showHighlight(null));
+    cubeCanvas.addEventListener('pointerdown', (e) => {
+      const dir = pick(e);
+      if (dir) lookFrom(dir);
     });
 
     homeBtn.addEventListener('click', () => {
@@ -192,15 +276,12 @@
       lastX = e.clientX; lastY = e.clientY;
       if (mode === 'orbit') {
         spherical.theta -= dx * 0.008;
-        spherical.phi = Math.max(0.08, Math.min(Math.PI - 0.08, spherical.phi - dy * 0.008));
+        spherical.phi = Math.max(0.05, Math.min(Math.PI - 0.05, spherical.phi - dy * 0.008));
       } else {
-        const pan = new THREE.Vector3();
         const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
         const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
         const scale = spherical.radius * 0.0016;
-        pan.addScaledVector(right, -dx * scale);
-        pan.addScaledVector(up, dy * scale);
-        target.add(pan);
+        target.addScaledVector(right, -dx * scale).addScaledVector(up, dy * scale);
       }
       applyCamera();
     });
@@ -222,13 +303,12 @@
     });
 
     function resize() {
-      const w = window.innerWidth, h = window.innerHeight;
-      renderer.setSize(w, h, false);
-      camera.aspect = w / h;
+      renderer.setSize(window.innerWidth, window.innerHeight, false);
+      camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
-      const size = 120 * Math.min(window.devicePixelRatio, 2);
-      cubeRenderer.setSize(120, 120, false);
-      cubeCamera.aspect = 1;
+      const rect = cubeCanvas.getBoundingClientRect();
+      cubeRenderer.setSize(rect.width, rect.height, false);
+      cubeCamera.aspect = rect.width / rect.height;
       cubeCamera.updateProjectionMatrix();
     }
     window.addEventListener('resize', resize);
@@ -236,7 +316,7 @@
 
     function frame() {
       const dir = new THREE.Vector3().subVectors(camera.position, target).normalize();
-      cubeCamera.position.copy(dir.multiplyScalar(4));
+      cubeCamera.position.copy(dir.multiplyScalar(4.2));
       cubeCamera.lookAt(0, 0, 0);
       renderer.render(scene, camera);
       cubeRenderer.render(cubeScene, cubeCamera);
