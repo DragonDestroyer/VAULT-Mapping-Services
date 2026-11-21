@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VAULT Mapping Services</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #1c1f24; color: #e8e8e8; font-family: system-ui, sans-serif; overflow: hidden; }
+    #view { width: 100vw; height: 100vh; display: block; }
+    #hud {
+      position: fixed; top: 16px; right: 16px; z-index: 2;
+      display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+      user-select: none;
+    }
+    #cube-wrap {
+      width: 120px; height: 120px; border-radius: 12px;
+      background: rgba(20, 22, 26, 0.72); border: 1px solid rgba(255,255,255,0.12);
+      overflow: hidden; cursor: pointer;
+    }
+    #cube { width: 100%; height: 100%; display: block; }
+    #home {
+      background: rgba(20, 22, 26, 0.85); color: #f3f3f3;
+      border: 1px solid rgba(255,255,255,0.16); border-radius: 10px;
+      padding: 8px 14px; font-size: 13px; letter-spacing: 0.04em; cursor: pointer;
+    }
+    #home:hover { border-color: rgba(255,255,255,0.4); }
+    #hint {
+      position: fixed; left: 16px; bottom: 14px; z-index: 2;
+      font-size: 12px; color: rgba(255,255,255,0.55); pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <div id="hud">
+    <div id="cube-wrap" title="Click a face to look from that side">
+      <canvas id="cube"></canvas>
+    </div>
+    <button id="home" type="button">Home</button>
+  </div>
+  <div id="hint">Middle drag orbit · Shift+middle pan · Scroll zoom</div>
+
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+
+    const view = document.getElementById('view');
+    const cubeCanvas = document.getElementById('cube');
+    const homeBtn = document.getElementById('home');
+
+    const renderer = new THREE.WebGLRenderer({ canvas: view, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x2a3038);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 500);
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(40, 40),
+      new THREE.MeshLambertMaterial({ color: 0x8d9298 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const block = new THREE.Mesh(
+      new THREE.BoxGeometry(2.4, 8, 2.4),
+      new THREE.MeshLambertMaterial({ color: 0x8a5a32 })
+    );
+    block.position.y = 4;
+    scene.add(block);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+    sun.position.set(8, 14, 6);
+    scene.add(sun);
+
+    const grid = new THREE.GridHelper(40, 20, 0x5c626a, 0x6e747c);
+    grid.position.y = 0.01;
+    scene.add(grid);
+
+    const target = new THREE.Vector3(0, 2, 0);
+    const spherical = new THREE.Spherical(18, 1.05, 0.7);
+    const homeSpherical = spherical.clone();
+    const homeTarget = target.clone();
+
+    function applyCamera() {
+      const offset = new THREE.Vector3().setFromSpherical(spherical);
+      camera.position.copy(target).add(offset);
+      camera.lookAt(target);
+    }
+    applyCamera();
+
+    const cubeRenderer = new THREE.WebGLRenderer({ canvas: cubeCanvas, antialias: true, alpha: true });
+    cubeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const cubeScene = new THREE.Scene();
+    const cubeCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 20);
+    const cubeGeo = new THREE.BoxGeometry(1.4, 1.4, 1.4);
+    const faceMats = [
+      new THREE.MeshBasicMaterial({ color: 0xd7dbe0 }), // +x right
+      new THREE.MeshBasicMaterial({ color: 0xb7bcc2 }), // -x left
+      new THREE.MeshBasicMaterial({ color: 0xf2f4f6 }), // +y top
+      new THREE.MeshBasicMaterial({ color: 0x8e949b }), // -y bottom
+      new THREE.MeshBasicMaterial({ color: 0xc5cad0 }), // +z front
+      new THREE.MeshBasicMaterial({ color: 0xaeb4ba }), // -z back
+    ];
+    const cubeMesh = new THREE.Mesh(cubeGeo, faceMats);
+    cubeScene.add(cubeMesh);
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(cubeGeo),
+      new THREE.LineBasicMaterial({ color: 0x1b1e22 })
+    );
+    cubeScene.add(edges);
+
+    function makeLabel(text) {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 128;
+      const g = c.getContext('2d');
+      g.fillStyle = '#1c1f24';
+      g.font = 'bold 28px system-ui, sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(text, 64, 64);
+      const tex = new THREE.CanvasTexture(c);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), mat);
+      return plane;
+    }
+    const labels = [
+      ['RIGHT',  new THREE.Vector3(0.71, 0, 0),  0,  Math.PI / 2],
+      ['LEFT',   new THREE.Vector3(-0.71, 0, 0), 0, -Math.PI / 2],
+      ['TOP',    new THREE.Vector3(0, 0.71, 0),  -Math.PI / 2, 0],
+      ['BOTTOM', new THREE.Vector3(0, -0.71, 0), Math.PI / 2, 0],
+      ['FRONT',  new THREE.Vector3(0, 0, 0.71),  0, 0],
+      ['BACK',   new THREE.Vector3(0, 0, -0.71), 0, Math.PI],
+    ];
+    for (const [text, pos, rx, ry] of labels) {
+      const plane = makeLabel(text);
+      plane.position.copy(pos);
+      plane.rotation.set(rx, ry, 0);
+      cubeScene.add(plane);
+    }
+
+    const cubeRay = new THREE.Raycaster();
+    const ndc = new THREE.Vector2();
+    cubeCanvas.addEventListener('pointerdown', (e) => {
+      const rect = cubeCanvas.getBoundingClientRect();
+      ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      cubeRay.setFromCamera(ndc, cubeCamera);
+      const hit = cubeRay.intersectObject(cubeMesh, false)[0];
+      if (!hit || !hit.face) return;
+      const n = hit.face.normal.clone();
+      const views = {
+        '1,0,0':  [Math.PI / 2, 0],
+        '-1,0,0': [-Math.PI / 2, 0],
+        '0,1,0':  [0, 0.01],
+        '0,-1,0': [0, Math.PI - 0.01],
+        '0,0,1':  [0, Math.PI / 2],
+        '0,0,-1': [Math.PI, Math.PI / 2],
+      };
+      const key = `${Math.round(n.x)},${Math.round(n.y)},${Math.round(n.z)}`;
+      const view = views[key];
+      if (!view) return;
+      spherical.theta = view[0];
+      spherical.phi = view[1];
+      spherical.radius = 18;
+      applyCamera();
+    });
+
+    homeBtn.addEventListener('click', () => {
+      spherical.copy(homeSpherical);
+      target.copy(homeTarget);
+      applyCamera();
+    });
+
+    let mode = null;
+    let lastX = 0, lastY = 0;
+    view.addEventListener('pointerdown', (e) => {
+      if (e.button !== 1) return;
+      e.preventDefault();
+      mode = e.shiftKey ? 'pan' : 'orbit';
+      lastX = e.clientX; lastY = e.clientY;
+      view.setPointerCapture(e.pointerId);
+    });
+    view.addEventListener('pointermove', (e) => {
+      if (!mode) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+      if (mode === 'orbit') {
+        spherical.theta -= dx * 0.008;
+        spherical.phi = Math.max(0.08, Math.min(Math.PI - 0.08, spherical.phi - dy * 0.008));
+      } else {
+        const pan = new THREE.Vector3();
+        const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+        const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+        const scale = spherical.radius * 0.0016;
+        pan.addScaledVector(right, -dx * scale);
+        pan.addScaledVector(up, dy * scale);
+        target.add(pan);
+      }
+      applyCamera();
+    });
+    const endDrag = () => { mode = null; };
+    view.addEventListener('pointerup', endDrag);
+    view.addEventListener('pointercancel', endDrag);
+    view.addEventListener('contextmenu', (e) => e.preventDefault());
+    view.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      spherical.radius = Math.max(4, Math.min(80, spherical.radius * (e.deltaY > 0 ? 1.08 : 0.92)));
+      applyCamera();
+    }, { passive: false });
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        spherical.copy(homeSpherical);
+        target.copy(homeTarget);
+        applyCamera();
+      }
+    });
+
+    function resize() {
+      const w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      const size = 120 * Math.min(window.devicePixelRatio, 2);
+      cubeRenderer.setSize(120, 120, false);
+      cubeCamera.aspect = 1;
+      cubeCamera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function frame() {
+      const dir = new THREE.Vector3().subVectors(camera.position, target).normalize();
+      cubeCamera.position.copy(dir.multiplyScalar(4));
+      cubeCamera.lookAt(0, 0, 0);
+      renderer.render(scene, camera);
+      cubeRenderer.render(cubeScene, cubeCamera);
+      requestAnimationFrame(frame);
+    }
+    frame();
+  </script>
+</body>
+</html>
