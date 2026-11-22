@@ -5,8 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VAULT Mapping Services</title>
   <style>
-    html, body { margin: 0; height: 100%; background: #1c1f24; color: #e8e8e8; font-family: system-ui, sans-serif; overflow: hidden; }
-    #view { width: 100vw; height: 100vh; display: block; }
+    :root { --panel-left: 0px; --panel-bottom: 0px; }
+    html, body { margin: 0; height: 100%; background: #242830; color: #e8e8e8; font-family: system-ui, sans-serif; overflow: hidden; }
+    #view {
+      position: fixed; z-index: 0;
+      top: 0; right: 0;
+      left: var(--panel-left); bottom: var(--panel-bottom);
+      width: auto; height: auto; display: block;
+    }
     #hud {
       position: fixed; top: 16px; right: 16px; z-index: 4;
       display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
@@ -18,60 +24,60 @@
     }
     #cube { width: 148px; height: 148px; display: block; cursor: crosshair; touch-action: none; }
     #home {
-      background: rgba(20, 22, 26, 0.85); color: #f3f3f3;
-      border: 1px solid rgba(255,255,255,0.16); border-radius: 10px;
+      background: #242830; color: #f3f3f3;
+      border: 1px solid rgba(255,255,255,0.28); border-radius: 10px;
       padding: 8px 14px; font-size: 13px; letter-spacing: 0.04em; cursor: pointer;
     }
-    #home:hover { border-color: rgba(255,255,255,0.4); }
+    #home:hover { border-color: #7ec8ff; }
     #hint {
-      position: fixed; right: 16px; bottom: 14px; z-index: 4;
+      position: fixed; right: 16px; z-index: 4;
+      bottom: calc(var(--panel-bottom) + 14px);
       font-size: 12px; color: rgba(255,255,255,0.55); pointer-events: none;
     }
     .drawer {
-      position: fixed; z-index: 3;
+      position: fixed; z-index: 10;
       background: #242830;
       border: 1px solid rgba(255,255,255,0.28);
-      transition: transform 0.22s ease;
+      box-sizing: border-box;
+      transition: left 0.22s ease, bottom 0.22s ease;
     }
-    .drawer .panel { height: 100%; box-sizing: border-box; padding: 18px 16px; overflow: auto; background: #242830; }
+    .drawer .panel {
+      height: 100%; min-height: 100%; box-sizing: border-box;
+      padding: 18px 16px; overflow: auto; background: #242830;
+    }
     .drawer h2 {
       margin: 0 0 8px; font-size: 12px; letter-spacing: 0.12em;
       text-transform: uppercase; color: rgba(255,255,255,0.45); font-weight: 600;
     }
     .drawer p { margin: 0; font-size: 13px; color: rgba(255,255,255,0.62); line-height: 1.45; }
     .tab {
-      position: fixed; z-index: 6; display: grid; place-items: center;
+      position: fixed; z-index: 12; display: grid; place-items: center;
       background: #242830; color: #f4f7fb;
       border: 1px solid rgba(255,255,255,0.28); cursor: pointer;
       font-size: 18px; line-height: 1; padding: 0;
     }
     .tab:hover { border-color: #7ec8ff; color: #7ec8ff; }
     #left-drawer {
-      top: 0; left: 0; bottom: 0; width: 280px;
+      top: 0; bottom: var(--panel-bottom); left: -280px; width: 280px;
       border-left: 0; border-radius: 0 14px 14px 0;
-      transform: translateX(-100%);
     }
-    #left-drawer.open { transform: translateX(0); }
+    #left-drawer.open { left: 0; }
     #left-tab {
-      left: 0; top: 50%; width: 34px; height: 72px;
-      transform: translateY(-50%);
+      left: var(--panel-left); top: calc((100% - var(--panel-bottom)) / 2);
+      width: 34px; height: 72px; transform: translateY(-50%);
       border-radius: 0 10px 10px 0; border-left: 0;
     }
-    body.left-open #left-tab { left: 280px; }
     #bottom-drawer {
-      left: 0; right: 0; bottom: 0; height: 168px;
+      left: var(--panel-left); right: 0; bottom: -168px; height: 168px;
       border-bottom: 0; border-radius: 14px 14px 0 0;
-      transform: translateY(100%);
     }
-    #bottom-drawer.open { transform: translateY(0); }
-    body.left-open #bottom-drawer { left: 280px; }
+    #bottom-drawer.open { bottom: 0; }
     #bottom-tab {
-      left: 50%; bottom: 0; width: 72px; height: 32px;
+      left: calc(var(--panel-left) + (100vw - var(--panel-left)) / 2);
+      bottom: var(--panel-bottom); width: 72px; height: 32px;
       transform: translateX(-50%);
       border-radius: 10px 10px 0 0; border-bottom: 0;
     }
-    body.bottom-open #bottom-tab { bottom: 168px; }
-    body.left-open #bottom-tab { left: calc(50% + 140px); }
   </style>
 </head>
 <body>
@@ -111,15 +117,24 @@
     const bottomDrawer = document.getElementById('bottom-drawer');
     const leftTab = document.getElementById('left-tab');
     const bottomTab = document.getElementById('bottom-tab');
+    const LEFT_W = 280;
+    const BOTTOM_H = 168;
 
-    function toggleDrawer(drawer, tab, openChar, closeChar, side) {
+    function layout() {
+      const left = leftDrawer.classList.contains('open') ? LEFT_W : 0;
+      const bottom = bottomDrawer.classList.contains('open') ? BOTTOM_H : 0;
+      document.documentElement.style.setProperty('--panel-left', left + 'px');
+      document.documentElement.style.setProperty('--panel-bottom', bottom + 'px');
+      resize();
+    }
+    function toggleDrawer(drawer, tab, openChar, closeChar) {
       const open = drawer.classList.toggle('open');
       tab.textContent = open ? closeChar : openChar;
       tab.setAttribute('aria-expanded', open ? 'true' : 'false');
-      document.body.classList.toggle(side + '-open', open);
+      layout();
     }
-    leftTab.addEventListener('click', () => toggleDrawer(leftDrawer, leftTab, '\u203a', '\u2039', 'left'));
-    bottomTab.addEventListener('click', () => toggleDrawer(bottomDrawer, bottomTab, '\u2303', '\u2304', 'bottom'));
+    leftTab.addEventListener('click', () => toggleDrawer(leftDrawer, leftTab, '\u203a', '\u2039'));
+    bottomTab.addEventListener('click', () => toggleDrawer(bottomDrawer, bottomTab, '\u2303', '\u2304'));
 
     const renderer = new THREE.WebGLRenderer({ canvas: view, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -351,8 +366,10 @@
     });
 
     function resize() {
-      renderer.setSize(window.innerWidth, window.innerHeight, false);
-      camera.aspect = window.innerWidth / window.innerHeight;
+      const w = Math.max(view.clientWidth, 1);
+      const h = Math.max(view.clientHeight, 1);
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
       camera.updateProjectionMatrix();
       const rect = cubeCanvas.getBoundingClientRect();
       cubeRenderer.setSize(rect.width, rect.height, false);
@@ -360,7 +377,7 @@
       cubeCamera.updateProjectionMatrix();
     }
     window.addEventListener('resize', resize);
-    resize();
+    layout();
 
     function frame() {
       const dir = new THREE.Vector3().subVectors(camera.position, target).normalize();
