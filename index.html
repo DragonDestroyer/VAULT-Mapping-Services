@@ -89,9 +89,9 @@
     const cubeCamera = new THREE.PerspectiveCamera(35, 1, 0.1, 20);
     const SIZE = 1.5;
     const HALF = SIZE / 2;
-    const EDGE = 0.3;
-    const faceSpan = SIZE - EDGE * 2;
-    cubeScene.add(new THREE.Mesh(
+    const EDGE = 0.34;
+    const INSET = HALF - EDGE;
+    const cubeMesh = new THREE.Mesh(
       new THREE.BoxGeometry(SIZE, SIZE, SIZE),
       [
         new THREE.MeshBasicMaterial({ color: 0xd7dbe0 }),
@@ -101,11 +101,8 @@
         new THREE.MeshBasicMaterial({ color: 0xc5cad0 }),
         new THREE.MeshBasicMaterial({ color: 0xaeb4ba }),
       ]
-    ));
-    cubeScene.add(new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(SIZE, SIZE, SIZE)),
-      new THREE.LineBasicMaterial({ color: 0x1b1e22 })
-    ));
+    );
+    cubeScene.add(cubeMesh);
 
     function makeLabel(text) {
       const c = document.createElement('canvas');
@@ -117,7 +114,7 @@
       g.textBaseline = 'middle';
       g.fillText(text, 64, 64);
       return new THREE.Mesh(
-        new THREE.PlaneGeometry(0.72, 0.72),
+        new THREE.PlaneGeometry(0.62, 0.62),
         new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true })
       );
     }
@@ -135,41 +132,81 @@
       cubeScene.add(plane);
     }
 
-    const overlay = new THREE.Mesh(
-      new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshBasicMaterial({ color: 0x1aa3ff, transparent: true, opacity: 0.75, depthTest: false })
-    );
-    overlay.visible = false;
-    overlay.renderOrder = 2;
-    cubeScene.add(overlay);
+    const zoneMat = new THREE.LineBasicMaterial({ color: 0x4a515a });
+    for (const [normal, u, v] of [['x', 'y', 'z'], ['y', 'x', 'z'], ['z', 'x', 'y']]) {
+      for (const sign of [-1, 1]) {
+        const pts = [[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]].map(([su, sv]) => {
+          const p = new THREE.Vector3();
+          p[normal] = sign * (HALF + 0.012);
+          p[u] = su * INSET;
+          p[v] = sv * INSET;
+          return p;
+        });
+        cubeScene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), zoneMat));
+      }
+    }
 
+    const hlMat = new THREE.MeshBasicMaterial({
+      color: 0x1aa3ff, transparent: true, opacity: 0.72, depthTest: false,
+    });
+    const hl = [0, 1, 2].map(() => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), hlMat);
+      mesh.visible = false;
+      mesh.renderOrder = 2;
+      cubeScene.add(mesh);
+      return mesh;
+    });
+    function rangeFor(sign) {
+      return sign > 0 ? [INSET, HALF - 0.02] : [-(HALF - 0.02), -INSET];
+    }
+    function placePatch(mesh, normal, sign, u, u0, u1, v, v0, v1) {
+      const size = new THREE.Vector3();
+      const pos = new THREE.Vector3();
+      size[normal] = 0.045;
+      pos[normal] = sign * (HALF + 0.028);
+      size[u] = Math.abs(u1 - u0);
+      size[v] = Math.abs(v1 - v0);
+      pos[u] = (u0 + u1) / 2;
+      pos[v] = (v0 + v1) / 2;
+      mesh.geometry.dispose();
+      mesh.geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+      mesh.position.copy(pos);
+      mesh.visible = true;
+    }
+    function showHighlight(dir) {
+      hl.forEach((m) => { m.visible = false; });
+      if (!dir) return;
+      const axes = ['x', 'y', 'z'].filter((a) => dir[a] !== 0);
+      const free = ['x', 'y', 'z'].filter((a) => dir[a] === 0);
+      if (axes.length === 1) {
+        const [n] = axes;
+        const [u, v] = free;
+        placePatch(hl[0], n, dir[n], u, -INSET, INSET, v, -INSET, INSET);
+      } else if (axes.length === 2) {
+        const [a, b] = axes;
+        const [f] = free;
+        const ar = rangeFor(dir[a]);
+        const br = rangeFor(dir[b]);
+        placePatch(hl[0], a, dir[a], b, br[0], br[1], f, -INSET, INSET);
+        placePatch(hl[1], b, dir[b], a, ar[0], ar[1], f, -INSET, INSET);
+      } else {
+        const [a, b, c] = axes;
+        const ar = rangeFor(dir[a]), br = rangeFor(dir[b]), cr = rangeFor(dir[c]);
+        placePatch(hl[0], a, dir[a], b, br[0], br[1], c, cr[0], cr[1]);
+        placePatch(hl[1], b, dir[b], a, ar[0], ar[1], c, cr[0], cr[1]);
+        placePatch(hl[2], c, dir[c], a, ar[0], ar[1], b, br[0], br[1]);
+      }
+    }
     function classify(point) {
       const dir = new THREE.Vector3();
       for (const axis of ['x', 'y', 'z']) {
-        if (Math.abs(point[axis]) >= HALF - EDGE) dir[axis] = Math.sign(point[axis]) || 1;
+        if (Math.abs(point[axis]) >= INSET) dir[axis] = Math.sign(point[axis]) || 1;
       }
       if (dir.lengthSq() === 0) {
         const axis = ['x', 'y', 'z'].sort((a, b) => Math.abs(point[b]) - Math.abs(point[a]))[0];
         dir[axis] = Math.sign(point[axis]) || 1;
       }
       return dir;
-    }
-    function showHighlight(dir) {
-      if (!dir) { overlay.visible = false; return; }
-      const size = new THREE.Vector3(faceSpan, faceSpan, faceSpan);
-      const pos = new THREE.Vector3();
-      for (const axis of ['x', 'y', 'z']) {
-        if (dir[axis] !== 0) {
-          size[axis] = EDGE;
-          pos[axis] = Math.sign(dir[axis]) * (HALF + 0.035);
-        }
-      }
-      const outward = ['x', 'y', 'z'].sort((a, b) => Math.abs(dir[b]) - Math.abs(dir[a]))[0];
-      size[outward] = 0.06;
-      overlay.geometry.dispose();
-      overlay.geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
-      overlay.position.copy(pos);
-      overlay.visible = true;
     }
     function lookFrom(dir) {
       const n = dir.clone().normalize();
@@ -180,14 +217,13 @@
     }
 
     const cubeRay = new THREE.Raycaster();
-    cubeRay.params.Mesh = { threshold: 0 };
     const ndc = new THREE.Vector2();
     function pick(e) {
       const rect = cubeCanvas.getBoundingClientRect();
       ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       cubeRay.setFromCamera(ndc, cubeCamera);
-      const hit = cubeRay.intersectObject(cubeScene.children[0], false)[0];
+      const hit = cubeRay.intersectObject(cubeMesh, false)[0];
       return hit ? classify(hit.point) : null;
     }
     cubeCanvas.addEventListener('pointermove', (e) => showHighlight(pick(e)));
