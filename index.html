@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VAULT Mapping Services</title>
   <style>
-    :root { --panel-left: 0px; --panel-bottom: 0px; }
+    :root { --panel-left: 0px; --panel-bottom: 0px; --tab-gap: 10px; }
     html, body { margin: 0; height: 100%; background: #242830; color: #e8e8e8; font-family: system-ui, sans-serif; overflow: hidden; }
-    #view {
+    #view-wrap {
       position: fixed; z-index: 0;
       top: 0; right: 0;
       left: var(--panel-left); bottom: var(--panel-bottom);
-      width: auto; height: auto; display: block;
     }
+    #view { width: 100%; height: 100%; display: block; }
     #hud {
       position: fixed; top: 16px; right: 16px; z-index: 4;
       display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
@@ -63,7 +63,8 @@
     }
     #left-drawer.open { left: 0; }
     #left-tab {
-      left: var(--panel-left); top: calc((100% - var(--panel-bottom)) / 2);
+      left: calc(var(--panel-left) + var(--tab-gap));
+      top: calc((100% - var(--panel-bottom)) / 2);
       width: 34px; height: 72px; transform: translateY(-50%);
       border-radius: 0 10px 10px 0; border-left: 0;
     }
@@ -74,14 +75,15 @@
     #bottom-drawer.open { bottom: 0; }
     #bottom-tab {
       left: calc(var(--panel-left) + (100vw - var(--panel-left)) / 2);
-      bottom: var(--panel-bottom); width: 72px; height: 32px;
+      bottom: calc(var(--panel-bottom) + var(--tab-gap));
+      width: 72px; height: 32px;
       transform: translateX(-50%);
       border-radius: 10px 10px 0 0; border-bottom: 0;
     }
   </style>
 </head>
 <body>
-  <canvas id="view"></canvas>
+  <div id="view-wrap"><canvas id="view"></canvas></div>
   <button id="left-tab" class="tab" type="button" aria-label="Toggle left menu" aria-expanded="false">›</button>
   <aside id="left-drawer">
     <div class="panel">
@@ -110,6 +112,7 @@
   <script type="module">
     import * as THREE from 'three';
 
+    const viewWrap = document.getElementById('view-wrap');
     const view = document.getElementById('view');
     const cubeCanvas = document.getElementById('cube');
     const homeBtn = document.getElementById('home');
@@ -366,8 +369,8 @@
     });
 
     function resize() {
-      const w = Math.max(view.clientWidth, 1);
-      const h = Math.max(view.clientHeight, 1);
+      const w = Math.max(viewWrap.clientWidth, 1);
+      const h = Math.max(viewWrap.clientHeight, 1);
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
@@ -378,6 +381,7 @@
     }
     window.addEventListener('resize', resize);
     layout();
+    requestAnimationFrame(resize);
 
     function frame() {
       const dir = new THREE.Vector3().subVectors(camera.position, target).normalize();
