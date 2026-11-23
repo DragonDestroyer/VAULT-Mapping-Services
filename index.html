@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VAULT Mapping Services</title>
   <style>
-    :root { --panel-left: 0px; --panel-bottom: 0px; --tab-gap: 10px; }
+    :root { --panel-left: 0px; --panel-bottom: 0px; }
     html, body { margin: 0; height: 100%; background: #242830; color: #e8e8e8; font-family: system-ui, sans-serif; overflow: hidden; }
     #view-wrap {
       position: fixed; z-index: 0;
@@ -43,7 +43,7 @@
     }
     .drawer .panel {
       height: 100%; min-height: 100%; box-sizing: border-box;
-      padding: 18px 16px; overflow: auto; background: #242830;
+      padding: 28px 24px 24px 28px; overflow: auto; background: #242830;
     }
     .drawer h2 {
       margin: 0 0 8px; font-size: 12px; letter-spacing: 0.12em;
@@ -63,7 +63,7 @@
     }
     #left-drawer.open { left: 0; }
     #left-tab {
-      left: calc(var(--panel-left) + var(--tab-gap));
+      left: var(--panel-left);
       top: calc((100% - var(--panel-bottom)) / 2);
       width: 34px; height: 72px; transform: translateY(-50%);
       border-radius: 0 10px 10px 0; border-left: 0;
@@ -73,9 +73,10 @@
       border-bottom: 0; border-radius: 14px 14px 0 0;
     }
     #bottom-drawer.open { bottom: 0; }
+    #bottom-drawer .panel { padding-bottom: 28px; }
     #bottom-tab {
       left: calc(var(--panel-left) + (100vw - var(--panel-left)) / 2);
-      bottom: calc(var(--panel-bottom) + var(--tab-gap));
+      bottom: var(--panel-bottom);
       width: 72px; height: 32px;
       transform: translateX(-50%);
       border-radius: 10px 10px 0 0; border-bottom: 0;
